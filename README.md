@@ -14,6 +14,7 @@ docker compose up
 - A Jira planning skill at `.agents/skills/create-plan-symphony/`.
 - Persisted plans in `.plans/`.
 - Local long-term project memory in `.memory/` backed by SQLite.
+- Repo-owned Superpowers L4 quality gates in `.agents/skills/superpowers-l4-quality-gates/`.
 - A repository-owned workflow contract in `WORKFLOW.md`.
 - MCP server configuration in `config/mcp.servers.yaml`.
 - Secret redaction and guarded writes in `src/symphony_l4_runner/security.py`.
@@ -50,6 +51,22 @@ python scripts/project_memory.py boot-context --issue-id HACK-123
 The runner injects issue-aware boot context into the Codex prompt before execution. The `memory` MCP server exposes the same surface to agents: `capture`, `search`, `boot_context`, `record_run`, and `record_decision`. The workflow records plan, validation, and PR handoff checkpoints after major steps.
 
 Memory is local-only and ignored by Git. Secret scanning rejects likely tokens, passwords, API keys, and authorization headers before any memory record is written.
+
+## Superpowers L4 Quality Gates
+
+Autonomous runs use a curated, repo-owned Superpowers workflow layer at `.agents/skills/superpowers-l4-quality-gates/`. This is included in the Docker workspace and does not depend on the desktop app plugin cache.
+
+The included workflows are:
+
+- `writing-plans`
+- `executing-plans`
+- `test-driven-development`
+- `systematic-debugging`
+- `verification-before-completion`
+- `requesting-code-review`
+- `finishing-development-branch`
+
+`WORKFLOW.md` applies these gates at the plan, implementation, debugging, verification, review, and finish stages. In autonomous mode, blocked gates must either proceed with a logged safe assumption or escalate through Jira.
 
 ## Setup
 
@@ -154,6 +171,7 @@ For enterprise MCP connectors, set command variables such as `MCP_JIRA_COMMAND` 
 ## Install Paths
 
 - Skill path: `.agents/skills/create-plan-symphony/`
+- Quality gates skill path: `.agents/skills/superpowers-l4-quality-gates/`
 - Skill metadata: `.agents/skills/create-plan-symphony/agents/openai.yaml`
 - Plan persistence script: `.agents/skills/create-plan-symphony/scripts/persist_plan.py`
 - Escalation script: `.agents/skills/create-plan-symphony/scripts/escalate_to_human.py`
@@ -168,12 +186,13 @@ For enterprise MCP connectors, set command variables such as `MCP_JIRA_COMMAND` 
 
 `WORKFLOW.md` defines the autonomous loop:
 
-1. Load project memory boot context for the Jira issue.
-2. Invoke `create-plan-symphony` on a Jira issue.
-3. Commit `.plans/<issue-id>.md` with `chore(plan): <issue-id> initial plan`.
-4. Implement based on the plan.
-5. Re-read the plan, summarize plan vs implementation differences, and record validation memory.
-6. Open a PR with the plan path and validation summary.
+1. Load `superpowers-l4-quality-gates`.
+2. Load project memory boot context for the Jira issue.
+3. Invoke `create-plan-symphony` on a Jira issue.
+4. Commit `.plans/<issue-id>.md` with `chore(plan): <issue-id> initial plan`.
+5. Implement based on the plan with TDD/debugging gates.
+6. Re-read the plan, summarize plan vs implementation differences, and record validation memory.
+7. Open a PR with the plan path, validation summary, and Quality Gate Evidence.
 
 ## Validation
 
@@ -187,3 +206,15 @@ docker compose run --rm --no-deps symphony python scripts/demo_test_run.py
 ```
 
 The validation script checks skill YAML, `openai.yaml`, plan examples, required docs, both skill scripts, and the project-memory CLI.
+
+## End-To-End Evidence Scenario
+
+Run the full local proof scenario from the host:
+
+```bash
+python scripts/e2e_scenario.py
+```
+
+The scenario builds the Docker image, verifies Codex CLI/App Server inside Docker, confirms outbound research access, checks the read-only SSO credential mount, validates MCP declarations, exercises plan persistence, Jira escalation logging, SQLite project memory, secret rejection, the Symphony dry-run supervisor, and the bundled demo run.
+
+Each run writes redacted proof artifacts under `evidence/e2e-<timestamp>/`. Review `evidence/e2e-<timestamp>/SUMMARY.md` for the pass/fail matrix and links to stdout/stderr logs.
