@@ -20,18 +20,20 @@ The desktop app remains outside Docker. Docker runs only the headless execution 
 - `src/symphony_l4_runner/agent_runner.py`: Codex CLI subprocess handoff for autonomous execution, including issue-aware memory boot context injection.
 - `src/symphony_l4_runner/security.py`: redaction, secret-write rejection, and path containment helpers.
 - `.agents/skills/create-plan-symphony/`: Jira-backed planning skill and deterministic helper scripts.
+- `.agents/skills/superpowers-l4-quality-gates/`: repo-owned autonomous planning, TDD, debugging, verification, review, and finishing gates.
 
 ## Data Flow
 
 1. The supervisor loads `WORKFLOW.md`.
 2. The supervisor validates `config/mcp.servers.yaml`.
-3. The runner loads a compact boot context from `.memory/project-memory.sqlite3`.
-4. Jira issues are read through the Jira MCP server.
-5. Each issue gets a deterministic workspace under `/workspace`.
-6. `create-plan-symphony` persists `.plans/<issue-id>.md`.
-7. Codex executes the workflow in the issue workspace.
-8. Plan, validation, and handoff checkpoints are recorded to project memory.
-9. GitHub PR operations happen through MCP.
+3. The workflow requires `superpowers-l4-quality-gates`.
+4. The runner loads a compact boot context from `.memory/project-memory.sqlite3`.
+5. Jira issues are read through the Jira MCP server.
+6. Each issue gets a deterministic workspace under `/workspace`.
+7. `create-plan-symphony` persists `.plans/<issue-id>.md`.
+8. Codex executes the workflow in the issue workspace using quality gates for plan, TDD/debugging, verification, review, and finish stages.
+9. Plan, validation, and handoff checkpoints are recorded to project memory.
+10. GitHub PR operations happen through MCP.
 
 ## Project Memory
 

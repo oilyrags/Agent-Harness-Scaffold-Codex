@@ -15,6 +15,15 @@ REQUIRED_FILES = (
     ".agents/skills/create-plan-symphony/agents/openai.yaml",
     ".agents/skills/create-plan-symphony/scripts/persist_plan.py",
     ".agents/skills/create-plan-symphony/scripts/escalate_to_human.py",
+    ".agents/skills/superpowers-l4-quality-gates/SKILL.md",
+    ".agents/skills/superpowers-l4-quality-gates/agents/openai.yaml",
+    ".agents/skills/superpowers-l4-quality-gates/workflows/writing-plans.md",
+    ".agents/skills/superpowers-l4-quality-gates/workflows/executing-plans.md",
+    ".agents/skills/superpowers-l4-quality-gates/workflows/test-driven-development.md",
+    ".agents/skills/superpowers-l4-quality-gates/workflows/systematic-debugging.md",
+    ".agents/skills/superpowers-l4-quality-gates/workflows/verification-before-completion.md",
+    ".agents/skills/superpowers-l4-quality-gates/workflows/requesting-code-review.md",
+    ".agents/skills/superpowers-l4-quality-gates/workflows/finishing-development-branch.md",
     "WORKFLOW.md",
     ".plans/EXAMPLE.md",
     "README.md",
@@ -23,12 +32,15 @@ REQUIRED_FILES = (
     "config/mcp.servers.yaml",
     "scripts/demo_test_run.py",
     "scripts/project_memory.py",
+    "scripts/e2e_scenario.py",
     "docs/PROJECT_MEMORY.md",
+    "docs/QUALITY_GATES.md",
     "src/symphony_l4_runner/memory.py",
     "src/symphony_l4_runner/mcp_memory_server.py",
     "tests/test_project_memory.py",
     "tests/test_project_memory_cli.py",
     "tests/test_agent_memory_context.py",
+    "tests/test_quality_gates.py",
 )
 
 REQUIRED_PLAN_SECTIONS = (
@@ -42,12 +54,14 @@ REQUIRED_PLAN_SECTIONS = (
 
 README_INSTALL_PATHS = (
     ".agents/skills/create-plan-symphony/",
+    ".agents/skills/superpowers-l4-quality-gates/",
     ".plans/",
     ".memory/",
     "~/.codex",
     "/root/.codex:ro",
     "/workspace",
     "scripts/project_memory.py",
+    "scripts/e2e_scenario.py",
 )
 
 
@@ -55,6 +69,7 @@ def main() -> int:
     checks = [
         check_required_files,
         check_skill_frontmatter_yaml,
+        check_quality_gate_skill_frontmatter_yaml,
         check_openai_yaml,
         check_mcp_yaml,
         check_workflow,
@@ -95,10 +110,35 @@ def check_skill_frontmatter_yaml() -> None:
     assert "Jira" in data["description"]
 
 
+def check_quality_gate_skill_frontmatter_yaml() -> None:
+    skill_dir = ROOT / ".agents/skills/superpowers-l4-quality-gates"
+    text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+    frontmatter = extract_frontmatter(text)
+    data = yaml.safe_load(frontmatter)
+    assert data["name"] == "superpowers-l4-quality-gates"
+    assert "autonomous" in data["description"]
+    expected = {
+        "writing-plans.md",
+        "executing-plans.md",
+        "test-driven-development.md",
+        "systematic-debugging.md",
+        "verification-before-completion.md",
+        "requesting-code-review.md",
+        "finishing-development-branch.md",
+    }
+    actual = {path.name for path in (skill_dir / "workflows").glob("*.md")}
+    missing = sorted(expected.difference(actual))
+    if missing:
+        raise AssertionError(f"missing quality-gate workflow files: {', '.join(missing)}")
+
+
 def check_openai_yaml() -> None:
     data = yaml.safe_load((ROOT / ".agents/skills/create-plan-symphony/agents/openai.yaml").read_text(encoding="utf-8"))
     assert data["interface"]["display_name"] == "Create Plan Symphony"
     assert "$create-plan-symphony" in data["interface"]["default_prompt"]
+    quality = yaml.safe_load((ROOT / ".agents/skills/superpowers-l4-quality-gates/agents/openai.yaml").read_text(encoding="utf-8"))
+    assert quality["interface"]["display_name"] == "Superpowers L4 Quality Gates"
+    assert "$superpowers-l4-quality-gates" in quality["interface"]["default_prompt"]
 
 
 def check_mcp_yaml() -> None:
@@ -122,6 +162,8 @@ def check_workflow() -> None:
     assert "--skip-git-repo-check" in data["codex"]["command"]
     assert data["codex"]["app_server_command"] == "codex app-server"
     assert data["memory"]["db_path"] == "/workspace/.memory/project-memory.sqlite3"
+    assert data["quality_gates"]["skill"] == "superpowers-l4-quality-gates"
+    assert "verification-before-completion" in data["quality_gates"]["required_workflows"]
     assert "memory" in data["mcp"]["required_servers"]
     assert data["security"]["api_keys_allowed"] is False
     assert "create-plan-symphony" in text
@@ -144,7 +186,10 @@ def check_readme() -> None:
     assert "desktop app itself does not run inside Docker" in text
     assert "Project Memory" in text
     assert "SQLite" in text
+    assert "Superpowers L4 Quality Gates" in text
     assert "scripts/demo_test_run.py" in text
+    assert "scripts/e2e_scenario.py" in text
+    assert "End-To-End Evidence Scenario" in text
     for path in README_INSTALL_PATHS:
         assert path in text
 
@@ -233,7 +278,7 @@ def check_scripts_run() -> None:
 
 
 def check_no_disallowed_tracker_terms() -> None:
-    ignored = {".git", ".pytest_cache", "__pycache__", ".demo-workspaces", ".memory"}
+    ignored = {".git", ".pytest_cache", "__pycache__", ".demo-workspaces", ".e2e-workspaces", ".evidence", "evidence", ".memory"}
     offenders: list[str] = []
     for path in ROOT.rglob("*"):
         if any(part in ignored for part in path.parts):

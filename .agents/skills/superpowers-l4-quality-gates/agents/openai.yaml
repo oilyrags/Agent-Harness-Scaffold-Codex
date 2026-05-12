@@ -1,0 +1,13 @@
+version: 1
+interface:
+  display_name: Superpowers L4 Quality Gates
+  default_prompt: "Use $superpowers-l4-quality-gates to apply planning, TDD, debugging, verification, review, and finishing gates for this Symphony autonomous run."
+runtime:
+  mode: repository_skill
+  requires:
+    - create-plan-symphony
+    - project_memory
+    - jira_mcp
+security:
+  api_keys_allowed: false
+  external_services_via_mcp_only: true

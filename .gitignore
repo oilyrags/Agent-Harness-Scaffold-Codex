@@ -8,6 +8,9 @@ venv/
 !.env.example
 .DS_Store
 .demo-workspaces/
+.e2e-workspaces/
+.evidence/
+evidence/
 .memory/
 .plans/*
 !.plans/EXAMPLE.md

@@ -14,6 +14,7 @@ This repository is built for Codex + Symphony autonomous execution against Jira-
 - Use Jira issue identifiers such as `HACK-123`; do not introduce other tracker terminology.
 - Create and persist plans under `.plans/<issue-id>.md`.
 - Follow `WORKFLOW.md` for plan, implementation, validation, and PR handoff.
+- Use `.agents/skills/superpowers-l4-quality-gates/` for autonomous planning, TDD, debugging, verification, review, and branch finishing gates.
 - Do not commit directly to `main`.
 
 ## Validation
