@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -62,6 +63,20 @@ class WorkflowDefinition:
     @property
     def codex_container_surface(self) -> str:
         return str(self.config.get("codex", {}).get("container_surface", "cli_or_app_server")).strip()
+
+    @property
+    def memory_db_path(self) -> Path | None:
+        raw = os.environ.get("PROJECT_MEMORY_DB") or self.config.get("memory", {}).get("db_path")
+        if not raw:
+            return None
+        path = Path(str(raw)).expanduser()
+        if not path.is_absolute():
+            path = self.path.parent / path
+        return path.resolve()
+
+    @property
+    def memory_boot_context_limit(self) -> int:
+        return int(self.config.get("memory", {}).get("boot_context_limit", 8))
 
 
 def load_workflow(path: str | Path) -> WorkflowDefinition:

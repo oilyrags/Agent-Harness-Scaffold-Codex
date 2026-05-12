@@ -13,6 +13,7 @@ docker compose up
 - A Symphony-compatible supervisor loop in `src/symphony_l4_runner/`.
 - A Jira planning skill at `.agents/skills/create-plan-symphony/`.
 - Persisted plans in `.plans/`.
+- Local long-term project memory in `.memory/` backed by SQLite.
 - A repository-owned workflow contract in `WORKFLOW.md`.
 - MCP server configuration in `config/mcp.servers.yaml`.
 - Secret redaction and guarded writes in `src/symphony_l4_runner/security.py`.
@@ -29,6 +30,26 @@ Host desktop app -> Docker Compose -> Symphony supervisor -> Codex CLI/App Serve
 ```
 
 The desktop app itself does not run inside Docker.
+
+## Project Memory
+
+This repo includes local long-term project memory for autonomous engineering runs. It is intentionally simple and inspectable: a SQLite database at `.memory/project-memory.sqlite3` with full-text search when SQLite FTS5 is available, plus a safe fallback search.
+
+Use it from the host or container:
+
+```bash
+python scripts/project_memory.py init
+python scripts/project_memory.py capture \
+  --kind decision \
+  --title "Validation policy" \
+  --body "Run repository validation before merging." \
+  --tag validation
+python scripts/project_memory.py boot-context --issue-id HACK-123
+```
+
+The runner injects issue-aware boot context into the Codex prompt before execution. The `memory` MCP server exposes the same surface to agents: `capture`, `search`, `boot_context`, `record_run`, and `record_decision`. The workflow records plan, validation, and PR handoff checkpoints after major steps.
+
+Memory is local-only and ignored by Git. Secret scanning rejects likely tokens, passwords, API keys, and authorization headers before any memory record is written.
 
 ## Setup
 
@@ -62,6 +83,7 @@ docker compose run --rm --no-deps symphony python scripts/demo_test_run.py
 ```
 
 The demo confirms the container can see the Codex CLI, validates the App Server command name, renders a sample Symphony prompt, creates a sample workspace under `/workspace`, and performs a dry-run dispatch without contacting external services.
+It also writes and searches a demo project-memory database in the throwaway demo workspace.
 
 ## Modes
 
@@ -113,6 +135,7 @@ Core tools:
 
 - `filesystem`: restricted to `/workspace`.
 - `shell`: restricted command execution through `symphony_l4_runner.mcp_shell_server`.
+- `memory`: local SQLite project memory for boot context, decisions, run summaries, and validation checkpoints.
 - `browser`: Playwright MCP.
 
 Service tools:
@@ -135,6 +158,8 @@ For enterprise MCP connectors, set command variables such as `MCP_JIRA_COMMAND` 
 - Plan persistence script: `.agents/skills/create-plan-symphony/scripts/persist_plan.py`
 - Escalation script: `.agents/skills/create-plan-symphony/scripts/escalate_to_human.py`
 - Plan output directory: `.plans/`
+- Project memory directory: `.memory/`
+- Project memory CLI: `scripts/project_memory.py`
 - Codex SSO credential directory on host: `~/.codex`
 - Docker credential mount: `/root/.codex:ro`
 - Workspace mount: `/workspace`
@@ -143,11 +168,12 @@ For enterprise MCP connectors, set command variables such as `MCP_JIRA_COMMAND` 
 
 `WORKFLOW.md` defines the autonomous loop:
 
-1. Invoke `create-plan-symphony` on a Jira issue.
-2. Commit `.plans/<issue-id>.md` with `chore(plan): <issue-id> initial plan`.
-3. Implement based on the plan.
-4. Re-read the plan and summarize plan vs implementation differences.
-5. Open a PR with the plan path and validation summary.
+1. Load project memory boot context for the Jira issue.
+2. Invoke `create-plan-symphony` on a Jira issue.
+3. Commit `.plans/<issue-id>.md` with `chore(plan): <issue-id> initial plan`.
+4. Implement based on the plan.
+5. Re-read the plan, summarize plan vs implementation differences, and record validation memory.
+6. Open a PR with the plan path and validation summary.
 
 ## Validation
 
@@ -155,8 +181,9 @@ Run:
 
 ```bash
 python scripts/validate_repo.py
-python -m symphony_l4_runner --workflow WORKFLOW.md --once --dry-run
+python -m unittest discover -s tests
+PYTHONPATH=src python -m symphony_l4_runner --workflow WORKFLOW.md --once --dry-run
 docker compose run --rm --no-deps symphony python scripts/demo_test_run.py
 ```
 
-The validation script checks skill YAML, `openai.yaml`, plan examples, required docs, and both skill scripts.
+The validation script checks skill YAML, `openai.yaml`, plan examples, required docs, both skill scripts, and the project-memory CLI.

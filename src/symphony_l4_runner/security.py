@@ -52,6 +52,8 @@ def redacted_environment(extra: dict[str, str] | None = None) -> dict[str, str]:
         "TERM",
         "CODEX_HOME",
         "PYTHONPATH",
+        "PYTHONDONTWRITEBYTECODE",
+        "PROJECT_MEMORY_DB",
         "PLAYWRIGHT_BROWSERS_PATH",
         "WORKSPACE_ROOT",
         "PLANS_DIR",

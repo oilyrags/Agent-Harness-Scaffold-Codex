@@ -9,6 +9,7 @@ venv
 !.env.example
 .codex
 .demo-workspaces
+.memory
 .plans/*
 !.plans/EXAMPLE.md
 node_modules

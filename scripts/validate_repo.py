@@ -22,6 +22,13 @@ REQUIRED_FILES = (
     "docker-compose.yml",
     "config/mcp.servers.yaml",
     "scripts/demo_test_run.py",
+    "scripts/project_memory.py",
+    "docs/PROJECT_MEMORY.md",
+    "src/symphony_l4_runner/memory.py",
+    "src/symphony_l4_runner/mcp_memory_server.py",
+    "tests/test_project_memory.py",
+    "tests/test_project_memory_cli.py",
+    "tests/test_agent_memory_context.py",
 )
 
 REQUIRED_PLAN_SECTIONS = (
@@ -36,9 +43,11 @@ REQUIRED_PLAN_SECTIONS = (
 README_INSTALL_PATHS = (
     ".agents/skills/create-plan-symphony/",
     ".plans/",
+    ".memory/",
     "~/.codex",
     "/root/.codex:ro",
     "/workspace",
+    "scripts/project_memory.py",
 )
 
 
@@ -96,9 +105,10 @@ def check_mcp_yaml() -> None:
     data = yaml.safe_load((ROOT / "config/mcp.servers.yaml").read_text(encoding="utf-8"))
     assert data["auth"]["api_keys_allowed"] is False
     servers = data["servers"]
-    for name in ("filesystem", "shell", "browser", "github", "jira", "notion", "miro", "figma", "lovable", "postgres", "chroma"):
+    for name in ("filesystem", "shell", "memory", "browser", "github", "jira", "notion", "miro", "figma", "lovable", "postgres", "chroma"):
         assert name in servers
         assert servers[name]["capabilities"]
+    assert data["servers"]["memory"]["command"] == ["python", "-m", "symphony_l4_runner.mcp_memory_server"]
 
 
 def check_workflow() -> None:
@@ -111,6 +121,8 @@ def check_workflow() -> None:
     assert "--ephemeral" in data["codex"]["command"]
     assert "--skip-git-repo-check" in data["codex"]["command"]
     assert data["codex"]["app_server_command"] == "codex app-server"
+    assert data["memory"]["db_path"] == "/workspace/.memory/project-memory.sqlite3"
+    assert "memory" in data["mcp"]["required_servers"]
     assert data["security"]["api_keys_allowed"] is False
     assert "create-plan-symphony" in text
     assert "Step 1" in text and "Step 5" in text
@@ -130,6 +142,8 @@ def check_readme() -> None:
     assert "codex login" in text
     assert "docker compose up" in text
     assert "desktop app itself does not run inside Docker" in text
+    assert "Project Memory" in text
+    assert "SQLite" in text
     assert "scripts/demo_test_run.py" in text
     for path in README_INSTALL_PATHS:
         assert path in text
@@ -173,9 +187,53 @@ def check_scripts_run() -> None:
             raise AssertionError(result.stderr)
         assert (Path(temp_dir) / "escalations.log").exists()
 
+        memory = ROOT / "scripts/project_memory.py"
+        db_path = Path(temp_dir) / "project-memory.sqlite3"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(memory),
+                "--db",
+                str(db_path),
+                "capture",
+                "--kind",
+                "decision",
+                "--title",
+                "Validation memory",
+                "--body",
+                "Repository validation verifies durable SQLite project memory.",
+                "--issue-id",
+                "VAL-1",
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise AssertionError(result.stderr)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(memory),
+                "--db",
+                str(db_path),
+                "boot-context",
+                "--issue-id",
+                "VAL-1",
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise AssertionError(result.stderr)
+        assert "Validation memory" in result.stdout
+
 
 def check_no_disallowed_tracker_terms() -> None:
-    ignored = {".git", ".pytest_cache", "__pycache__"}
+    ignored = {".git", ".pytest_cache", "__pycache__", ".demo-workspaces", ".memory"}
     offenders: list[str] = []
     for path in ROOT.rglob("*"):
         if any(part in ignored for part in path.parts):
