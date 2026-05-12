@@ -1,0 +1,56 @@
+services:
+  symphony:
+    build:
+      context: .
+    working_dir: /workspace
+    command: ["python", "-m", "symphony_l4_runner", "--workflow", "/workspace/WORKFLOW.md"]
+    environment:
+      CODEX_HOME: "/root/.codex"
+      PYTHONPATH: "/workspace/src"
+      SYMPHONY_MODE: "${SYMPHONY_MODE:-interactive}"
+      SYMPHONY_DRY_RUN: "${SYMPHONY_DRY_RUN:-true}"
+      SYMPHONY_LOG_LEVEL: "${SYMPHONY_LOG_LEVEL:-INFO}"
+      WORKSPACE_ROOT: "/workspace"
+      PLANS_DIR: "/workspace/.plans"
+    volumes:
+      - .:/workspace
+      - ${HOME}/.codex:/root/.codex:ro
+      - symphony-postgres:/var/lib/postgresql/data
+      - symphony-chroma:/var/lib/chroma
+    stdin_open: true
+    tty: true
+    depends_on:
+      - postgres
+      - chroma
+    networks:
+      - symphony
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: symphony
+      POSTGRES_DB: symphony
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - symphony-postgres:/var/lib/postgresql/data
+    networks:
+      - symphony
+
+  chroma:
+    image: chromadb/chroma:latest
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: "/var/lib/chroma"
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - symphony-chroma:/var/lib/chroma
+    networks:
+      - symphony
+
+volumes:
+  symphony-postgres:
+  symphony-chroma:
+
+networks:
+  symphony:
+    driver: bridge

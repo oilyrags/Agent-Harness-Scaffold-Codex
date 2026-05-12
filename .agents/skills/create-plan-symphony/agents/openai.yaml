@@ -1,0 +1,16 @@
+interface:
+  display_name: "Create Plan Symphony"
+  short_description: "Create Jira-backed Symphony plans"
+  default_prompt: "Use $create-plan-symphony to create and persist a Jira-backed Symphony implementation plan."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "jira"
+      description: "Jira MCP server for issue reads, updates, and clarification status transitions."
+      transport: "stdio"
+    - type: "mcp"
+      value: "filesystem"
+      description: "Filesystem MCP server restricted to /workspace."
+      transport: "stdio"
+policy:
+  allow_implicit_invocation: true

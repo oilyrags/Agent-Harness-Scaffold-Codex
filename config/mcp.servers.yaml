@@ -1,0 +1,106 @@
+version: 1
+auth:
+  mode: codex_sso
+  codex_home: /root/.codex
+  credential_mount: /root/.codex:ro
+  api_keys_allowed: false
+security:
+  workspace_root: /workspace
+  redact_output: true
+  reject_secret_writes: true
+servers:
+  filesystem:
+    transport: stdio
+    command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+    required: true
+    root: /workspace
+    capabilities:
+      - read_file
+      - write_file
+      - list_directory
+      - search_files
+  shell:
+    transport: stdio
+    command: ["python", "-m", "symphony_l4_runner.mcp_shell_server"]
+    required: true
+    root: /workspace
+    capabilities:
+      - exec
+      - run_command
+  browser:
+    transport: stdio
+    command: ["npx", "-y", "@playwright/mcp", "--headless"]
+    required: true
+    capabilities:
+      - navigate
+      - click
+      - type
+      - screenshot
+      - evaluate
+  github:
+    transport: stdio
+    command_env: MCP_GITHUB_COMMAND
+    required: true
+    restrictions:
+      no_main_branch_commits: true
+    capabilities:
+      - clone
+      - branch
+      - commit
+      - pull_request
+  jira:
+    transport: stdio
+    command_env: MCP_JIRA_COMMAND
+    required: true
+    capabilities:
+      - read_issues
+      - create_ticket
+      - update_ticket
+      - transition_ticket
+      - needs_clarification
+  notion:
+    transport: stdio
+    command_env: MCP_NOTION_COMMAND
+    required: true
+    capabilities:
+      - create_pages
+      - manage_docs
+  miro:
+    transport: stdio
+    command_env: MCP_MIRO_COMMAND
+    required: true
+    capabilities:
+      - create_boards
+      - create_diagrams
+  figma:
+    transport: stdio
+    command_env: MCP_FIGMA_COMMAND
+    required: true
+    capabilities:
+      - ui_generation
+      - component_updates
+  lovable:
+    transport: stdio
+    command_env: MCP_LOVABLE_COMMAND
+    required: true
+    capabilities:
+      - generate_apps
+      - iterate_product_ideas
+  postgres:
+    transport: stdio
+    command_env: MCP_POSTGRES_COMMAND
+    required: true
+    network: local_only
+    capabilities:
+      - query
+      - schema
+      - migrations
+  chroma:
+    transport: stdio
+    command_env: MCP_CHROMA_COMMAND
+    required: true
+    network: local_only
+    capabilities:
+      - upsert_vectors
+      - query_vectors
+      - delete_vectors

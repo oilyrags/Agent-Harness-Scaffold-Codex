@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "symphony-l4-hackathon-infra"
+version = "0.1.0"
+description = "Dockerized Codex + Symphony L4 autonomous programming scaffold with Jira and MCP."
+requires-python = ">=3.11"
+dependencies = [
+  "pyyaml>=6.0",
+  "mcp>=1.2.0",
+]
+
+[project.scripts]
+symphony-l4-runner = "symphony_l4_runner.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
