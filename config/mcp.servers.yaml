@@ -27,6 +27,17 @@ servers:
     capabilities:
       - exec
       - run_command
+  memory:
+    transport: stdio
+    command: ["python", "-m", "symphony_l4_runner.mcp_memory_server"]
+    required: true
+    root: /workspace
+    capabilities:
+      - capture
+      - search
+      - boot_context
+      - record_run
+      - record_decision
   browser:
     transport: stdio
     command: ["npx", "-y", "@playwright/mcp", "--headless"]

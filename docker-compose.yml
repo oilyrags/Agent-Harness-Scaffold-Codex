@@ -7,11 +7,13 @@ services:
     environment:
       CODEX_HOME: "/root/.codex"
       PYTHONPATH: "/workspace/src"
+      PYTHONDONTWRITEBYTECODE: "1"
       SYMPHONY_MODE: "${SYMPHONY_MODE:-interactive}"
       SYMPHONY_DRY_RUN: "${SYMPHONY_DRY_RUN:-true}"
       SYMPHONY_LOG_LEVEL: "${SYMPHONY_LOG_LEVEL:-INFO}"
       WORKSPACE_ROOT: "/workspace"
       PLANS_DIR: "/workspace/.plans"
+      PROJECT_MEMORY_DB: "/workspace/.memory/project-memory.sqlite3"
     volumes:
       - .:/workspace
       - ${HOME}/.codex:/root/.codex:ro

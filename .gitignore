@@ -8,6 +8,7 @@ venv/
 !.env.example
 .DS_Store
 .demo-workspaces/
+.memory/
 .plans/*
 !.plans/EXAMPLE.md
 node_modules/

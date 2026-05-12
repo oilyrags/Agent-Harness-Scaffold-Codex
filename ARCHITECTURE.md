@@ -15,7 +15,9 @@ The desktop app remains outside Docker. Docker runs only the headless execution 
 - `WORKFLOW.md`: repository-owned Symphony contract with tracker, workspace, agent, MCP, and security settings.
 - `src/symphony_l4_runner/supervisor.py`: long-running poll loop and dispatch boundary.
 - `src/symphony_l4_runner/mcp_proxy.py`: MCP-only external-service access and workspace path enforcement.
-- `src/symphony_l4_runner/agent_runner.py`: Codex CLI subprocess handoff for autonomous execution.
+- `src/symphony_l4_runner/memory.py`: local SQLite project memory with secret rejection and issue-aware boot context.
+- `src/symphony_l4_runner/mcp_memory_server.py`: MCP surface for memory capture, search, run checkpoints, and decisions.
+- `src/symphony_l4_runner/agent_runner.py`: Codex CLI subprocess handoff for autonomous execution, including issue-aware memory boot context injection.
 - `src/symphony_l4_runner/security.py`: redaction, secret-write rejection, and path containment helpers.
 - `.agents/skills/create-plan-symphony/`: Jira-backed planning skill and deterministic helper scripts.
 
@@ -23,11 +25,19 @@ The desktop app remains outside Docker. Docker runs only the headless execution 
 
 1. The supervisor loads `WORKFLOW.md`.
 2. The supervisor validates `config/mcp.servers.yaml`.
-3. Jira issues are read through the Jira MCP server.
-4. Each issue gets a deterministic workspace under `/workspace`.
-5. `create-plan-symphony` persists `.plans/<issue-id>.md`.
-6. Codex executes the workflow in the issue workspace.
-7. GitHub PR operations happen through MCP.
+3. The runner loads a compact boot context from `.memory/project-memory.sqlite3`.
+4. Jira issues are read through the Jira MCP server.
+5. Each issue gets a deterministic workspace under `/workspace`.
+6. `create-plan-symphony` persists `.plans/<issue-id>.md`.
+7. Codex executes the workflow in the issue workspace.
+8. Plan, validation, and handoff checkpoints are recorded to project memory.
+9. GitHub PR operations happen through MCP.
+
+## Project Memory
+
+Project memory is local-first. The default database is `/workspace/.memory/project-memory.sqlite3`, mounted from the repository directory but ignored by Git. It stores compact decisions, assumptions, run summaries, validation checkpoints, and handoff notes.
+
+The implementation uses SQLite because it is durable, beginner-friendly, and needs no extra service. When SQLite FTS5 is available, searches use full-text ranking. If FTS5 is unavailable, the same API falls back to parameterized `LIKE` search. Chroma remains available as a separate MCP for vector workflows, but durable engineering memory starts with SQLite so the system works with `docker compose up`.
 
 ## Security Boundaries
 
@@ -36,4 +46,5 @@ The desktop app remains outside Docker. Docker runs only the headless execution 
 - The desktop app reads host configuration directly and is never copied into the container.
 - External services are accessed through MCP only.
 - Logs and plan writes use redaction and secret rejection.
+- Project memory rejects likely secret material before writing.
 - Filesystem and shell tools are restricted to `/workspace`.

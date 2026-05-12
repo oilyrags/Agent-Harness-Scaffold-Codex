@@ -89,6 +89,7 @@ class MCPProxy:
         required_names = {
             "filesystem",
             "shell",
+            "memory",
             "browser",
             "github",
             "jira",

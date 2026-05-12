@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from symphony_l4_runner.agent_runner import AgentRunner, render_prompt
 from symphony_l4_runner.config import load_workflow
 from symphony_l4_runner.issue import Issue
+from symphony_l4_runner.memory import ProjectMemory
 from symphony_l4_runner.workspace import WorkspaceManager
 
 
@@ -53,7 +54,28 @@ def main() -> int:
         raise RuntimeError("rendered prompt did not include expected Symphony/Jira context")
     print("demo: rendered prompt chars =", len(prompt))
 
-    workspace = WorkspaceManager(ROOT / ".demo-workspaces").create_for_issue(issue.identifier)
+    demo_root = ROOT / ".demo-workspaces"
+    shutil.rmtree(demo_root / issue.identifier, ignore_errors=True)
+    workspace = WorkspaceManager(demo_root).create_for_issue(issue.identifier)
+    memory = ProjectMemory(workspace.path / ".memory.sqlite3")
+    memory.record_decision(
+        issue_id=issue.identifier,
+        title="Demo runtime split verified",
+        body="The desktop app remains outside Docker while Codex CLI/App Server runs inside Docker.",
+        tags=["demo", "runtime"],
+    )
+    memory.record_run(
+        issue_id=issue.identifier,
+        event_type="demo",
+        summary="Rendered prompt and dry-run dispatch completed without contacting external MCP services.",
+    )
+    memory_hits = memory.search("desktop Docker", issue_id=issue.identifier)
+    if not memory_hits:
+        raise RuntimeError("project memory search did not return the demo decision")
+    boot_context = memory.boot_context(issue_id=issue.identifier)
+    if "Demo runtime split verified" not in boot_context:
+        raise RuntimeError("project memory boot context did not include the demo decision")
+    print("demo: project memory records =", len(memory_hits))
     runner = AgentRunner(workflow, dry_run=True)
     result = asyncio.run(runner.run_issue(issue, workspace.path))
     if result != 0:
