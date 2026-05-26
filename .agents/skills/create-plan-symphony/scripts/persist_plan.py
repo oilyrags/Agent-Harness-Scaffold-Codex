@@ -10,12 +10,34 @@ from pathlib import Path
 
 REQUIRED_SECTIONS = (
     "# Plan",
+    "## Vertical slice contract",
+    "### Slice outcome",
+    "### Behavior contract",
+    "### Interface contract",
+    "### Data contract",
+    "### Non-goals",
+    "### Acceptance criteria",
+    "### Verification contract",
+    "### Independent verifier instructions",
     "## Scope",
     "## Action items",
     "## Validation",
     "## Assumptions",
     "## Open questions",
 )
+
+VERTICAL_SLICE_SUBSECTIONS = (
+    "Slice outcome",
+    "Behavior contract",
+    "Interface contract",
+    "Data contract",
+    "Non-goals",
+    "Acceptance criteria",
+    "Verification contract",
+    "Independent verifier instructions",
+)
+
+CHECKLIST_SUBSECTIONS = {"Acceptance criteria", "Verification contract"}
 
 SECRET_PATTERNS = (
     re.compile(r"(?i)(api[_-]?key|token|secret|password|client[_-]?secret)\s*[:=]\s*['\"]?[^'\"\s]+"),
@@ -69,9 +91,27 @@ def validate_plan(content: str) -> None:
     missing = [section for section in REQUIRED_SECTIONS if section not in content]
     if missing:
         raise PlanError(f"missing required sections: {', '.join(missing)}")
+    validate_vertical_slice_contract(content)
     action_count = len(re.findall(r"(?m)^\[ \] .+", content))
     if action_count < 6 or action_count > 10:
         raise PlanError("plan must contain 6-10 unchecked action items")
+
+
+def validate_vertical_slice_contract(content: str) -> None:
+    for subsection in VERTICAL_SLICE_SUBSECTIONS:
+        body = extract_subsection_body(content, subsection)
+        if not body.strip():
+            raise PlanError(f"Vertical slice contract subsection is empty: {subsection}")
+        if subsection in CHECKLIST_SUBSECTIONS and not re.search(r"(?m)^- \[ \] .+", body):
+            raise PlanError(f"Vertical slice contract subsection requires checklist items: {subsection}")
+
+
+def extract_subsection_body(content: str, subsection: str) -> str:
+    pattern = rf"(?ms)^### {re.escape(subsection)}\s*\n(?P<body>.*?)(?=^### |^## |\Z)"
+    match = re.search(pattern, content)
+    if not match:
+        raise PlanError(f"missing vertical slice contract subsection: {subsection}")
+    return match.group("body")
 
 
 def reject_secrets(content: str) -> None:

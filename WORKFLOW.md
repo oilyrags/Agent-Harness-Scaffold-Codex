@@ -91,11 +91,25 @@ In autonomous mode, do not pause for broad process questions. If a quality gate 
 
 Before Step 1, call the `memory` MCP server `boot_context` tool for `{{ issue.identifier }}` and include relevant durable context in the planning prompt. The SQLite database lives at `/workspace/.memory/project-memory.sqlite3`, is local-only, and must never contain secrets.
 
+## Work Intake Classification
+
+Before planning, determine whether the input is an existing concrete implementation slice, a broad issue that needs child slices, a greenfield project with no Jira breakdown, or a missing Jira ticket reference.
+
+Identify the first smallest useful vertical slice. Avoid planning broad feature batches, horizontal implementation layers, or multiple greenfield slices in one pass.
+
+If the work is greenfield or lacks child implementation tickets, create or propose a parent Jira issue or Epic, decompose the initiative into contract-first vertical slices, create one Jira ticket per contracted slice, create enabling-task tickets only when necessary, make dependencies explicit, and select the first safe, reversible, independently testable slice for implementation.
+
+Create slice tickets autonomously only when the project goal is clear enough, no destructive or privileged action is required, slices are reversible and independently verifiable, and assumptions are recorded. Escalate to Jira instead of coding when the product goal is ambiguous, ownership or repository target is unclear, required external system behavior is unknown, ticket creation would affect a production process without approval, or the first reversible slice cannot be identified safely.
+
 ## Step 1
 
 Invoke `create-plan-symphony` on Jira issue `{{ issue.identifier }}`.
 
-The plan skill must read the Jira issue through MCP, read repository instructions, analyze relevant code, use project memory context when relevant, and generate a plan with Scope, Action items, Validation, Assumptions, and Open questions.
+The plan skill must read the Jira issue through MCP, read repository instructions, analyze relevant code, use project memory context when relevant, and generate a plan with Vertical slice contract, Scope, Action items, Validation, Assumptions, and Open questions.
+
+The `create-plan-symphony` plan must include a `Vertical slice contract` section defining slice outcome, behavior contract, interface contract, data contract if applicable, non-goals, acceptance criteria, verification contract, independent verifier instructions, and dependencies or ordering notes when applicable.
+
+If the Jira issue is too broad, select or create the first safe contracted slice and record assumptions. If no Jira slice tickets exist for a greenfield project, create the contracted Jira slice tickets before implementation. If ticket creation is unsafe or ambiguous, escalate to Jira instead of coding.
 
 Quality Gate: apply `writing-plans` and record the selected validation commands.
 
@@ -104,6 +118,8 @@ Quality Gate: apply `writing-plans` and record the selected validation commands.
 Commit plan:
 
 `.plans/{{ issue.identifier }}.md`
+
+Persist only the selected implementation slice plan to `.plans/{{ issue.identifier }}.md`. Record any greenfield slice breakdown, assumptions, dependencies, ordering notes, and ticket creation results in project memory.
 
 Commit message:
 
@@ -115,9 +131,11 @@ Quality Gate: apply `executing-plans` before implementation begins.
 
 ## Step 3
 
-Implement code based on the persisted plan.
+Implement code based on the persisted plan. Implement only the selected slice, not the entire initiative or multiple greenfield slices in one pass.
 
 Use the Docker sandbox and `/workspace` for all file operations. Use MCP for filesystem, shell, memory, browser, GitHub, Jira, Notion, Miro, Figma, Lovable, Postgres, and Chroma access.
+
+Do not perform unrelated refactors, silently expand scope, or invent product behavior outside the contract. If implementation requires changing the contract, stop and update the persisted plan before changing code.
 
 Quality Gate: apply `test-driven-development` for behavior-changing code and `systematic-debugging` before fixing any failed command.
 
@@ -128,7 +146,11 @@ Before PR:
 - Re-read `.plans/{{ issue.identifier }}.md`.
 - Generate a concise plan vs implementation diff summary.
 - Run validation commands from the plan and repository docs.
+- Run an independent verifier pass that compares the implementation against the persisted contract.
+- Check behavior contract alignment, interface contract alignment, data contract alignment, acceptance criteria, verification evidence, unrelated file changes, hidden scope expansion, and plan-vs-implementation drift.
 - Call `memory.record_run` with the validation summary and implementation diff summary.
+
+Verification evidence, including independent verifier evidence, must be recorded before PR handoff.
 
 Quality Gate: apply `verification-before-completion` and `requesting-code-review`.
 
@@ -136,9 +158,15 @@ Quality Gate: apply `verification-before-completion` and `requesting-code-review
 
 Open PR with:
 
+- Jira issue id: `{{ issue.identifier }}`.
 - Plan path: `.plans/{{ issue.identifier }}.md`.
-- Diff summary.
+- Slice delivered.
+- Contract implemented.
 - Validation summary.
+- Independent verifier evidence.
+- Plan-vs-implementation differences.
+- Known risks.
+- Follow-up slices.
 - Jira issue link.
 
 Record the PR link and final handoff notes with `memory.record_run`.

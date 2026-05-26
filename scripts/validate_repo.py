@@ -11,6 +11,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_FILES = (
+    "AGENTS.md",
     ".agents/skills/create-plan-symphony/SKILL.md",
     ".agents/skills/create-plan-symphony/agents/openai.yaml",
     ".agents/skills/create-plan-symphony/scripts/persist_plan.py",
@@ -45,6 +46,15 @@ REQUIRED_FILES = (
 
 REQUIRED_PLAN_SECTIONS = (
     "# Plan",
+    "## Vertical slice contract",
+    "### Slice outcome",
+    "### Behavior contract",
+    "### Interface contract",
+    "### Data contract",
+    "### Non-goals",
+    "### Acceptance criteria",
+    "### Verification contract",
+    "### Independent verifier instructions",
     "## Scope",
     "## Action items",
     "## Validation",
@@ -72,7 +82,9 @@ def main() -> int:
         check_quality_gate_skill_frontmatter_yaml,
         check_openai_yaml,
         check_mcp_yaml,
+        check_agents_contract_policy,
         check_workflow,
+        check_create_plan_contract_policy,
         check_example_plan,
         check_readme,
         check_scripts_run,
@@ -168,6 +180,58 @@ def check_workflow() -> None:
     assert data["security"]["api_keys_allowed"] is False
     assert "create-plan-symphony" in text
     assert "Step 1" in text and "Step 5" in text
+    required_phrases = (
+        "concrete implementation slice",
+        "broad issue",
+        "greenfield project",
+        "missing Jira ticket",
+        "Vertical slice contract",
+        "create the contracted Jira slice tickets before implementation",
+        "independent verifier pass",
+        "plan-vs-implementation drift",
+    )
+    missing = [phrase for phrase in required_phrases if phrase not in text]
+    if missing:
+        raise AssertionError(f"workflow missing contract-first policy text: {', '.join(missing)}")
+
+
+def check_agents_contract_policy() -> None:
+    text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    required_phrases = (
+        "## Contract-First Vertical Slicing",
+        "All coding work must be delivered as contract-first vertical slices.",
+        "A builder may implement only one bounded, testable behavior at a time.",
+        "Do not proceed to implementation until the persisted plan contains the vertical slice contract.",
+        "If Jira tickets do not exist for a greenfield project, create the required contracted Jira slices before coding.",
+        "Implement only the selected contracted slice, not the entire initiative.",
+    )
+    missing = [phrase for phrase in required_phrases if phrase not in text]
+    if missing:
+        raise AssertionError(f"AGENTS.md missing contract-first policy text: {', '.join(missing)}")
+
+
+def check_create_plan_contract_policy() -> None:
+    text = (ROOT / ".agents/skills/create-plan-symphony/SKILL.md").read_text(encoding="utf-8")
+    required_phrases = (
+        "## Work Item Classification",
+        "Existing concrete Jira implementation slice",
+        "Broad Jira issue that needs child slices",
+        "Greenfield project with no Jira breakdown",
+        "Missing or nonexistent Jira issue reference",
+        "## Vertical slice contract",
+        "### Slice outcome",
+        "### Behavior contract",
+        "### Interface contract",
+        "### Data contract",
+        "### Non-goals",
+        "### Acceptance criteria",
+        "### Verification contract",
+        "### Independent verifier instructions",
+        "Do not implement multiple greenfield slices in one pass.",
+    )
+    missing = [phrase for phrase in required_phrases if phrase not in text]
+    if missing:
+        raise AssertionError(f"create-plan-symphony missing contract-first policy text: {', '.join(missing)}")
 
 
 def check_example_plan() -> None:

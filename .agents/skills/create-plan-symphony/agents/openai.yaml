@@ -1,7 +1,7 @@
 interface:
   display_name: "Create Plan Symphony"
-  short_description: "Create Jira-backed Symphony plans"
-  default_prompt: "Use $create-plan-symphony to create and persist a Jira-backed Symphony implementation plan."
+  short_description: "Create contracted Jira-backed Symphony slice plans"
+  default_prompt: "Use $create-plan-symphony to create and persist a contract-first Jira-backed Symphony implementation slice plan."
 dependencies:
   tools:
     - type: "mcp"
