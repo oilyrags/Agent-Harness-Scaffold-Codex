@@ -168,6 +168,14 @@ Service tools:
 
 For enterprise MCP connectors, set command variables such as `MCP_JIRA_COMMAND` and `MCP_GITHUB_COMMAND` in your shell or Codex MCP configuration. These variables name connector commands; they must not contain secrets.
 
+For Docker Compose live mode, copy `.env.example` to `.env` and fill in connector command strings:
+
+```bash
+cp .env.example .env
+```
+
+Use SSO/OAuth-backed connector commands such as `npx -y mcp-remote https://mcp.atlassian.com/v1/mcp` where supported. Do not put API keys or bearer tokens in `.env`.
+
 ## Install Paths
 
 - Skill path: `.agents/skills/create-plan-symphony/`

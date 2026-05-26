@@ -25,6 +25,7 @@ REQUIRED_FILES = (
     ".agents/skills/superpowers-l4-quality-gates/workflows/verification-before-completion.md",
     ".agents/skills/superpowers-l4-quality-gates/workflows/requesting-code-review.md",
     ".agents/skills/superpowers-l4-quality-gates/workflows/finishing-development-branch.md",
+    ".env.example",
     "WORKFLOW.md",
     ".plans/EXAMPLE.md",
     "README.md",
@@ -161,6 +162,19 @@ def check_mcp_yaml() -> None:
         assert name in servers
         assert servers[name]["capabilities"]
     assert data["servers"]["memory"]["command"] == ["python", "-m", "symphony_l4_runner.mcp_memory_server"]
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    compose_env = compose["services"]["symphony"]["environment"]
+    for variable in (
+        "MCP_GITHUB_COMMAND",
+        "MCP_JIRA_COMMAND",
+        "MCP_NOTION_COMMAND",
+        "MCP_MIRO_COMMAND",
+        "MCP_FIGMA_COMMAND",
+        "MCP_LOVABLE_COMMAND",
+        "MCP_POSTGRES_COMMAND",
+        "MCP_CHROMA_COMMAND",
+    ):
+        assert variable in compose_env
 
 
 def check_workflow() -> None:
@@ -342,7 +356,21 @@ def check_scripts_run() -> None:
 
 
 def check_no_disallowed_tracker_terms() -> None:
-    ignored = {".git", ".pytest_cache", "__pycache__", ".demo-workspaces", ".e2e-workspaces", ".evidence", "evidence", ".memory"}
+    ignored = {
+        ".git",
+        ".pytest_cache",
+        "__pycache__",
+        ".demo-workspaces",
+        ".e2e-workspaces",
+        ".evidence",
+        "evidence",
+        ".memory",
+        ".venv",
+        "venv",
+        "node_modules",
+        "dist",
+        "build",
+    }
     offenders: list[str] = []
     for path in ROOT.rglob("*"):
         if any(part in ignored for part in path.parts):

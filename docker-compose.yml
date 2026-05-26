@@ -14,6 +14,14 @@ services:
       WORKSPACE_ROOT: "/workspace"
       PLANS_DIR: "/workspace/.plans"
       PROJECT_MEMORY_DB: "/workspace/.memory/project-memory.sqlite3"
+      MCP_GITHUB_COMMAND: "${MCP_GITHUB_COMMAND:-}"
+      MCP_JIRA_COMMAND: "${MCP_JIRA_COMMAND:-}"
+      MCP_NOTION_COMMAND: "${MCP_NOTION_COMMAND:-}"
+      MCP_MIRO_COMMAND: "${MCP_MIRO_COMMAND:-}"
+      MCP_FIGMA_COMMAND: "${MCP_FIGMA_COMMAND:-}"
+      MCP_LOVABLE_COMMAND: "${MCP_LOVABLE_COMMAND:-}"
+      MCP_POSTGRES_COMMAND: "${MCP_POSTGRES_COMMAND:-}"
+      MCP_CHROMA_COMMAND: "${MCP_CHROMA_COMMAND:-}"
     volumes:
       - .:/workspace
       - ${HOME}/.codex:/root/.codex:ro
