@@ -3,20 +3,28 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import sys
 from pathlib import Path
 
 from .config import load_workflow
+from .doctor import run_doctor
 from .logging_setup import configure_logging
 from .supervisor import Supervisor
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "doctor":
+        if len(argv) > 1:
+            raise SystemExit("doctor does not accept arguments")
+        raise SystemExit(run_doctor())
+
     parser = argparse.ArgumentParser(description="Run the Codex + Symphony L4 supervisor.")
     parser.add_argument("--workflow", default="WORKFLOW.md", help="Path to WORKFLOW.md")
     parser.add_argument("--once", action="store_true", help="Run a single poll/dispatch tick and exit")
     parser.add_argument("--dry-run", action="store_true", help="Do not call live MCP servers or Codex")
     parser.add_argument("--check", action="store_true", help="Validate workflow and MCP config, then exit")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     configure_logging()
     workflow_path = Path(args.workflow)
