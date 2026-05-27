@@ -14,6 +14,8 @@ services:
       WORKSPACE_ROOT: "/workspace"
       PLANS_DIR: "/workspace/.plans"
       PROJECT_MEMORY_DB: "/workspace/.memory/project-memory.sqlite3"
+      JIRA_PROJECT_KEY: "${JIRA_PROJECT_KEY:-}"
+      JIRA_CLOUD_ID: "${JIRA_CLOUD_ID:-}"
       MCP_GITHUB_COMMAND: "${MCP_GITHUB_COMMAND:-}"
       MCP_JIRA_COMMAND: "${MCP_JIRA_COMMAND:-}"
       MCP_NOTION_COMMAND: "${MCP_NOTION_COMMAND:-}"
@@ -25,8 +27,11 @@ services:
     volumes:
       - .:/workspace
       - ${HOME}/.codex:/root/.codex:ro
+      - ${HOME}/.mcp-auth:/root/.mcp-auth
       - symphony-postgres:/var/lib/postgresql/data
       - symphony-chroma:/var/lib/chroma
+    ports:
+      - "3334:3334"
     stdin_open: true
     tty: true
     depends_on:

@@ -163,8 +163,11 @@ def check_mcp_yaml() -> None:
         assert servers[name]["capabilities"]
     assert data["servers"]["memory"]["command"] == ["python", "-m", "symphony_l4_runner.mcp_memory_server"]
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
-    compose_env = compose["services"]["symphony"]["environment"]
+    symphony = compose["services"]["symphony"]
+    compose_env = symphony["environment"]
     for variable in (
+        "JIRA_PROJECT_KEY",
+        "JIRA_CLOUD_ID",
         "MCP_GITHUB_COMMAND",
         "MCP_JIRA_COMMAND",
         "MCP_NOTION_COMMAND",
@@ -175,6 +178,13 @@ def check_mcp_yaml() -> None:
         "MCP_CHROMA_COMMAND",
     ):
         assert variable in compose_env
+    assert "3334:3334" in symphony["ports"]
+    assert "${HOME}/.mcp-auth:/root/.mcp-auth" in symphony["volumes"]
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    assert "MCP_JIRA_COMMAND=npx -y mcp-remote https://mcp.atlassian.com/v1/sse 3334" in env_example
+    assert "--host 0.0.0.0" in env_example
+    assert "--auth-timeout 120" in env_example
+    assert "--transport sse-only" in env_example
 
 
 def check_workflow() -> None:

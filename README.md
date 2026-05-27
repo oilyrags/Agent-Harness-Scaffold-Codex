@@ -174,7 +174,17 @@ For Docker Compose live mode, copy `.env.example` to `.env` and fill in connecto
 cp .env.example .env
 ```
 
-Use SSO/OAuth-backed connector commands such as `npx -y mcp-remote https://mcp.atlassian.com/v1/mcp` where supported. Do not put API keys or bearer tokens in `.env`.
+Use SSO/OAuth-backed connector commands where supported. Do not put API keys or bearer tokens in `.env`.
+
+This scaffold currently uses `mcp-remote` with Atlassian's `/v1/sse` endpoint for the Docker stdio bridge. Atlassian has announced `/v1/sse` deprecation after June 30, 2026; move back to `https://mcp.atlassian.com/v1/mcp` once the local proxy supports that path reliably for Docker OAuth.
+
+For Jira OAuth from Docker, the `symphony` service publishes callback port `3334` and stores `mcp-remote` OAuth state in `~/.mcp-auth`. Run one Jira probe with service ports enabled, complete the browser approval, then live-mode runs can reuse the cached OAuth state:
+
+```bash
+docker compose run --rm --service-ports symphony <jira-probe-command>
+```
+
+Set `JIRA_PROJECT_KEY` before live mode. The live runner refuses Jira polling without a project key so it does not scan every accessible Jira project.
 
 ## Install Paths
 

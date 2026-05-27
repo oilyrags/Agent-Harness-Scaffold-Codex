@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -64,6 +65,9 @@ class MCPProxy:
         command = spec.resolved_command()
         if not command:
             raise MCPConfigError(f"MCP server {server_name} requires command_env={spec.command_env}")
+
+        if server_name == "jira" and tool_name == "read_issues":
+            return await _read_atlassian_jira_issues(command, arguments)
 
         return await _call_mcp_stdio(command, tool_name, arguments)
 
@@ -138,3 +142,114 @@ async def _call_mcp_stdio(command: list[str], tool_name: str, arguments: dict[st
             await session.initialize()
             result = await session.call_tool(tool_name, arguments)
             return result
+
+
+async def _read_atlassian_jira_issues(command: list[str], arguments: dict[str, Any]) -> dict[str, Any]:
+    project_key = os.environ.get("JIRA_PROJECT_KEY", "").strip()
+    if not project_key:
+        raise MCPConfigError("JIRA_PROJECT_KEY must be set before live Jira polling")
+
+    cloud_id = os.environ.get("JIRA_CLOUD_ID", "").strip()
+    active_states = [str(state) for state in arguments.get("active_states", [])]
+
+    try:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+    except ImportError as exc:
+        raise MCPConfigError("the mcp Python package is required for live MCP calls") from exc
+
+    server_params = StdioServerParameters(
+        command=command[0],
+        args=command[1:],
+        env=redacted_environment(),
+    )
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            if not cloud_id:
+                cloud_id = await _discover_atlassian_cloud_id(session)
+            jql = build_jira_active_issues_jql(project_key, active_states)
+            result = await session.call_tool(
+                "searchJiraIssuesUsingJql",
+                {
+                    "cloudId": cloud_id,
+                    "jql": jql,
+                    "maxResults": 10,
+                    "fields": ["summary", "description", "status", "issuetype", "priority", "created", "updated"],
+                    "responseContentFormat": "markdown",
+                },
+            )
+            payload = _result_json_payload(result, "searchJiraIssuesUsingJql")
+            return {"issues": normalize_atlassian_jira_issues(payload)}
+
+
+async def _discover_atlassian_cloud_id(session: Any) -> str:
+    result = await session.call_tool("getAccessibleAtlassianResources", {})
+    resources = _result_json_payload(result, "getAccessibleAtlassianResources")
+    if not isinstance(resources, list) or not resources:
+        raise MCPConfigError("Jira MCP returned no accessible Atlassian resources")
+    cloud_id = str(resources[0].get("id") or "").strip()
+    if not cloud_id:
+        raise MCPConfigError("Jira MCP resource is missing cloud id")
+    return cloud_id
+
+
+def _result_json_payload(result: Any, tool_name: str) -> Any:
+    if getattr(result, "isError", False):
+        raise MCPConfigError(f"Jira MCP tool {tool_name} failed: {_result_text(result)}")
+    return extract_json_payload(_result_text(result))
+
+
+def _result_text(result: Any) -> str:
+    parts = []
+    for item in getattr(result, "content", []) or []:
+        text = getattr(item, "text", None)
+        if text:
+            parts.append(str(text))
+    return "\n".join(parts)
+
+
+def build_jira_active_issues_jql(project_key: str, active_states: list[str]) -> str:
+    if not project_key.strip():
+        raise MCPConfigError("project key is required")
+    if not active_states:
+        raise MCPConfigError("at least one active Jira state is required")
+    escaped_project = project_key.strip().replace('"', '\\"')
+    escaped_states = [state.replace('"', '\\"') for state in active_states]
+    state_clause = ", ".join(f'"{state}"' for state in escaped_states)
+    return f'project = "{escaped_project}" AND status in ({state_clause}) ORDER BY updated DESC'
+
+
+def extract_json_payload(text: str) -> Any:
+    stripped = text.strip()
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(stripped):
+        if char not in "{[":
+            continue
+        try:
+            payload, _ = decoder.raw_decode(stripped[index:])
+        except json.JSONDecodeError:
+            continue
+        return payload
+    raise MCPConfigError("MCP result did not contain JSON")
+
+
+def normalize_atlassian_jira_issues(payload: Any) -> list[dict[str, Any]]:
+    raw_issues = payload.get("issues", []) if isinstance(payload, dict) else []
+    issues: list[dict[str, Any]] = []
+    for issue in raw_issues:
+        if not isinstance(issue, dict):
+            continue
+        fields = issue.get("fields") if isinstance(issue.get("fields"), dict) else {}
+        status = fields.get("status") if isinstance(fields.get("status"), dict) else {}
+        item = {
+            "id": str(issue.get("id") or issue.get("key") or ""),
+            "identifier": str(issue.get("key") or ""),
+            "title": str(fields.get("summary") or ""),
+            "description": fields.get("description"),
+            "status": str(status.get("name") or ""),
+            "url": issue.get("self"),
+        }
+        if item["id"] and item["identifier"] and item["title"]:
+            issues.append(item)
+    return issues

@@ -36,6 +36,8 @@ class ValidateRepoTests(unittest.TestCase):
         environment = compose["services"]["symphony"]["environment"]
 
         for variable in (
+            "JIRA_PROJECT_KEY",
+            "JIRA_CLOUD_ID",
             "MCP_GITHUB_COMMAND",
             "MCP_JIRA_COMMAND",
             "MCP_NOTION_COMMAND",
@@ -46,6 +48,19 @@ class ValidateRepoTests(unittest.TestCase):
             "MCP_CHROMA_COMMAND",
         ):
             self.assertIn(variable, environment)
+
+    def test_compose_exposes_jira_oauth_callback_and_auth_cache(self) -> None:
+        compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+        symphony = compose["services"]["symphony"]
+
+        self.assertIn("3334:3334", symphony["ports"])
+        self.assertIn("${HOME}/.mcp-auth:/root/.mcp-auth", symphony["volumes"])
+
+        env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+        self.assertIn("MCP_JIRA_COMMAND=npx -y mcp-remote https://mcp.atlassian.com/v1/sse 3334", env_example)
+        self.assertIn("--host 0.0.0.0", env_example)
+        self.assertIn("--auth-timeout 120", env_example)
+        self.assertIn("--transport sse-only", env_example)
 
 
 if __name__ == "__main__":
