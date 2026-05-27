@@ -101,6 +101,8 @@ If the work is greenfield or lacks child implementation tickets, create or propo
 
 Create slice tickets autonomously only when the project goal is clear enough, no destructive or privileged action is required, slices are reversible and independently verifiable, and assumptions are recorded. Escalate to Jira instead of coding when the product goal is ambiguous, ownership or repository target is unclear, required external system behavior is unknown, ticket creation would affect a production process without approval, or the first reversible slice cannot be identified safely.
 
+When one slice depends on another, declare the dependency in the Jira issue description with parser-friendly wording such as `Dependencies: CAT-6` or `Depends on CAT-6`. The supervisor skips active issues with non-terminal or unresolved dependencies before dispatching Codex.
+
 ## Step 1
 
 Invoke `create-plan-symphony` on Jira issue `{{ issue.identifier }}`.

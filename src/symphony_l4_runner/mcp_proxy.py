@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ import yaml
 from .security import contains_secret, ensure_within_root, redact, redacted_environment
 
 LOGGER = logging.getLogger(__name__)
+JIRA_ISSUE_KEY_PATTERN = re.compile(r"\b[A-Z][A-Z0-9]+-\d+\b")
 
 
 class MCPConfigError(ValueError):
@@ -151,6 +153,7 @@ async def _read_atlassian_jira_issues(command: list[str], arguments: dict[str, A
 
     cloud_id = os.environ.get("JIRA_CLOUD_ID", "").strip()
     active_states = [str(state) for state in arguments.get("active_states", [])]
+    terminal_states = [str(state) for state in arguments.get("terminal_states", [])]
 
     try:
         from mcp import ClientSession, StdioServerParameters
@@ -180,7 +183,47 @@ async def _read_atlassian_jira_issues(command: list[str], arguments: dict[str, A
                 },
             )
             payload = _result_json_payload(result, "searchJiraIssuesUsingJql")
-            return {"issues": normalize_atlassian_jira_issues(payload)}
+            issues = normalize_atlassian_jira_issues(payload)
+            try:
+                dependency_statuses = await _read_dependency_statuses(session, cloud_id, issues)
+            except MCPConfigError as exc:
+                LOGGER.warning("jira dependency status lookup failed; dependent issues will be skipped error=%s", redact(str(exc)))
+                dependency_statuses = {}
+            return {
+                "issues": filter_issues_ready_for_dispatch(
+                    issues,
+                    dependency_statuses=dependency_statuses,
+                    terminal_states=terminal_states,
+                )
+            }
+
+
+async def _read_dependency_statuses(session: Any, cloud_id: str, issues: list[dict[str, Any]]) -> dict[str, str]:
+    dependency_keys = sorted({dependency for issue in issues for dependency in issue_dependencies(issue.get("description"))})
+    if not dependency_keys:
+        return {}
+    result = await session.call_tool(
+        "searchJiraIssuesUsingJql",
+        {
+            "cloudId": cloud_id,
+            "jql": build_jira_issue_keys_jql(dependency_keys),
+            "maxResults": min(max(len(dependency_keys), 1), 100),
+            "fields": ["status"],
+            "responseContentFormat": "markdown",
+        },
+    )
+    payload = _result_json_payload(result, "searchJiraIssuesUsingJql")
+    statuses: dict[str, str] = {}
+    for issue in payload.get("issues", []) if isinstance(payload, dict) else []:
+        if not isinstance(issue, dict):
+            continue
+        key = str(issue.get("key") or "")
+        fields = issue.get("fields") if isinstance(issue.get("fields"), dict) else {}
+        status = fields.get("status") if isinstance(fields.get("status"), dict) else {}
+        status_name = str(status.get("name") or "")
+        if key and status_name:
+            statuses[key] = status_name
+    return statuses
 
 
 async def _discover_atlassian_cloud_id(session: Any) -> str:
@@ -218,6 +261,48 @@ def build_jira_active_issues_jql(project_key: str, active_states: list[str]) -> 
     escaped_states = [state.replace('"', '\\"') for state in active_states]
     state_clause = ", ".join(f'"{state}"' for state in escaped_states)
     return f'project = "{escaped_project}" AND status in ({state_clause}) AND issuetype not in ("Epic") ORDER BY updated DESC'
+
+
+def build_jira_issue_keys_jql(issue_keys: list[str]) -> str:
+    keys = sorted({key.strip().upper() for key in issue_keys if JIRA_ISSUE_KEY_PATTERN.fullmatch(key.strip().upper())})
+    if not keys:
+        raise MCPConfigError("at least one Jira issue key is required")
+    return "key in (" + ", ".join(keys) + ")"
+
+
+def issue_dependencies(description: Any) -> list[str]:
+    if not isinstance(description, str):
+        return []
+    dependencies: list[str] = []
+    for line in description.splitlines():
+        stripped = line.strip()
+        if not re.match(r"(?i)^(?:#+\s*)?(?:dependencies|depends on)\b", stripped):
+            continue
+        dependencies.extend(JIRA_ISSUE_KEY_PATTERN.findall(stripped.upper()))
+    return sorted(set(dependencies))
+
+
+def filter_issues_ready_for_dispatch(
+    issues: list[dict[str, Any]], *, dependency_statuses: dict[str, str], terminal_states: list[str]
+) -> list[dict[str, Any]]:
+    terminal = {state.casefold() for state in terminal_states}
+    ready = []
+    for issue in issues:
+        dependencies = issue_dependencies(issue.get("description"))
+        blocked_by = [
+            dependency
+            for dependency in dependencies
+            if dependency_statuses.get(dependency, "").casefold() not in terminal
+        ]
+        if blocked_by:
+            LOGGER.info(
+                "skipping jira issue blocked_by_dependencies issue_identifier=%s dependencies=%s",
+                issue.get("identifier"),
+                blocked_by,
+            )
+            continue
+        ready.append(issue)
+    return ready
 
 
 def extract_json_payload(text: str) -> Any:
