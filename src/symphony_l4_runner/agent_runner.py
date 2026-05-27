@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
+import shutil
 import sqlite3
 import shlex
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +17,9 @@ from .memory import ProjectMemory
 from .security import redacted_environment, redact
 
 LOGGER = logging.getLogger(__name__)
+
+CODEX_READONLY_ENTRIES = ("auth.json", "config.toml", "AGENTS.md", "agents", "rules", "skills", "plugins")
+CODEX_WRITABLE_DIRS = ("bin", "tmp", ".tmp", "sessions", "runs", "log", "cache", "sqlite")
 
 
 class PromptRenderError(ValueError):
@@ -39,22 +45,37 @@ class AgentRunner:
         command = self.workflow.codex_command
         argv = shlex.split(command)
         LOGGER.info("starting Codex issue_identifier=%s command=%s", issue.identifier, redact(command))
-        process = await asyncio.create_subprocess_exec(
-            *argv,
-            cwd=str(workspace_path),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=redacted_environment(),
+        codex_runtime_home = prepare_codex_runtime_home(
+            Path(os.environ.get("CODEX_HOME", "/root/.codex")),
+            Path(os.environ.get("CODEX_RUNTIME_ROOT", "/run")),
         )
-        stdout, stderr = await process.communicate(prompt.encode("utf-8"))
-        if stdout:
-            LOGGER.info("codex stdout issue_identifier=%s output=%s", issue.identifier, redact(stdout.decode("utf-8", "replace")))
-        if stderr:
-            LOGGER.warning("codex stderr issue_identifier=%s output=%s", issue.identifier, redact(stderr.decode("utf-8", "replace")))
-        return_code = int(process.returncode or 0)
-        self._record_run_event(issue, return_code)
-        return return_code
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *argv,
+                cwd=str(workspace_path),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=redacted_environment({"CODEX_HOME": str(codex_runtime_home)}),
+            )
+            stdout, stderr = await process.communicate(prompt.encode("utf-8"))
+            if stdout:
+                LOGGER.info(
+                    "codex stdout issue_identifier=%s output=%s",
+                    issue.identifier,
+                    redact(stdout.decode("utf-8", "replace")),
+                )
+            if stderr:
+                LOGGER.warning(
+                    "codex stderr issue_identifier=%s output=%s",
+                    issue.identifier,
+                    redact(stderr.decode("utf-8", "replace")),
+                )
+            return_code = int(process.returncode or 0)
+            self._record_run_event(issue, return_code)
+            return return_code
+        finally:
+            shutil.rmtree(codex_runtime_home, ignore_errors=True)
 
     def build_prompt(self, issue: Issue, attempt: int | None = None) -> str:
         prompt = render_prompt(self.workflow.prompt_template, issue, attempt)
@@ -111,3 +132,17 @@ def render_prompt(template: str, issue: Issue, attempt: int | None) -> str:
         return str(values[name])
 
     return re.sub(r"\{\{\s*([^}]+?)\s*\}\}", replace, template)
+
+
+def prepare_codex_runtime_home(source_home: Path, runtime_root: Path) -> Path:
+    """Create a writable Codex home that reads credentials from a read-only source home."""
+
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    runtime_home = Path(tempfile.mkdtemp(prefix="codex-home-", dir=str(runtime_root)))
+    for name in CODEX_READONLY_ENTRIES:
+        source = source_home / name
+        if source.exists():
+            (runtime_home / name).symlink_to(source)
+    for name in CODEX_WRITABLE_DIRS:
+        (runtime_home / name).mkdir(parents=True, exist_ok=True)
+    return runtime_home

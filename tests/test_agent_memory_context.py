@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from symphony_l4_runner.agent_runner import AgentRunner
+from symphony_l4_runner.agent_runner import prepare_codex_runtime_home
 from symphony_l4_runner.config import WorkflowDefinition
 from symphony_l4_runner.issue import Issue
 from symphony_l4_runner.memory import ProjectMemory
@@ -47,6 +49,28 @@ class AgentMemoryContextTests(unittest.TestCase):
 
             self.assertIn("## Project Memory", prompt)
             self.assertIn("Remember validation policy", prompt)
+
+    def test_prepare_codex_runtime_home_links_read_only_credentials_and_uses_writable_state_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            source = temp_path / "readonly-codex"
+            source.mkdir()
+            for name in ("auth.json", "config.toml", "AGENTS.md"):
+                (source / name).write_text("placeholder", encoding="utf-8")
+            for name in ("agents", "rules", "skills", "plugins"):
+                (source / name).mkdir()
+
+            runtime = prepare_codex_runtime_home(source, temp_path / "runtime-root")
+
+            self.assertTrue((runtime / "auth.json").is_symlink())
+            self.assertEqual((runtime / "auth.json").resolve(), (source / "auth.json").resolve())
+            self.assertTrue((runtime / "config.toml").is_symlink())
+            self.assertTrue((runtime / "agents").is_symlink())
+            for name in ("bin", "tmp", "sessions", "runs", "log", "cache"):
+                path = runtime / name
+                self.assertTrue(path.is_dir(), name)
+                self.assertFalse(path.is_symlink(), name)
+            self.assertTrue(os.access(runtime / "sessions", os.W_OK))
 
 
 if __name__ == "__main__":
