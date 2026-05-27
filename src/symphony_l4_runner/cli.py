@@ -15,9 +15,10 @@ from .supervisor import Supervisor
 def main(argv: list[str] | None = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "doctor":
-        if len(argv) > 1:
-            raise SystemExit("doctor does not accept arguments")
-        raise SystemExit(run_doctor())
+        doctor_parser = argparse.ArgumentParser(description="Run the local no-secret live-mode preflight.")
+        doctor_parser.add_argument("--format", choices=("text", "json"), default="text", help="Output format")
+        doctor_args = doctor_parser.parse_args(argv[1:])
+        raise SystemExit(run_doctor(output_format=doctor_args.format))
 
     parser = argparse.ArgumentParser(description="Run the Codex + Symphony L4 supervisor.")
     parser.add_argument("--workflow", default="WORKFLOW.md", help="Path to WORKFLOW.md")
