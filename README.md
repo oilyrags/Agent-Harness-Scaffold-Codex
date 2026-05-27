@@ -24,7 +24,7 @@ docker compose up
 
 Use the Codex desktop app on your host machine. It is the human command center for supervising threads, reviewing diffs, and coordinating work.
 
-Use Docker for autonomous execution. Inside the container, Symphony launches the headless Codex worker through `codex exec --skip-git-repo-check --ephemeral --sandbox workspace-write --ask-for-approval never -`, with `codex app-server` documented in `WORKFLOW.md` for orchestrators that speak the App Server protocol.
+Use Docker for autonomous execution. Inside the container, Symphony launches the headless Codex worker through `codex exec --skip-git-repo-check --ephemeral --sandbox workspace-write -`, with `codex app-server` documented in `WORKFLOW.md` for orchestrators that speak the App Server protocol.
 
 ```text
 Host desktop app -> Docker Compose -> Symphony supervisor -> Codex CLI/App Server -> MCP tools

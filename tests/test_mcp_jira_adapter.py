@@ -19,7 +19,11 @@ class JiraAdapterTests(unittest.TestCase):
     def test_build_jira_active_issues_jql_scopes_to_project_and_states(self) -> None:
         jql = build_jira_active_issues_jql("HACK", ["To Do", "In Progress"])
 
-        self.assertEqual('project = "HACK" AND status in ("To Do", "In Progress") ORDER BY updated DESC', jql)
+        self.assertEqual(
+            'project = "HACK" AND status in ("To Do", "In Progress") '
+            'AND issuetype not in ("Epic") ORDER BY updated DESC',
+            jql,
+        )
 
     def test_extract_json_payload_ignores_provider_notice(self) -> None:
         payload = extract_json_payload(

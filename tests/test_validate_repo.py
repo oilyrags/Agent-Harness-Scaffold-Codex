@@ -62,6 +62,16 @@ class ValidateRepoTests(unittest.TestCase):
         self.assertIn("--auth-timeout 120", env_example)
         self.assertIn("--transport sse-only", env_example)
 
+    def test_workflow_codex_command_uses_supported_exec_flags(self) -> None:
+        workflow = (ROOT / "WORKFLOW.md").read_text(encoding="utf-8")
+        frontmatter = workflow.split("---\n", 2)[1]
+        command = yaml.safe_load(frontmatter)["codex"]["command"]
+
+        self.assertNotIn("--ask-for-approval", command)
+        self.assertIn("--skip-git-repo-check", command)
+        self.assertIn("--ephemeral", command)
+        self.assertIn("--sandbox workspace-write", command)
+
 
 if __name__ == "__main__":
     unittest.main()

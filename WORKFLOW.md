@@ -45,7 +45,7 @@ agent:
 codex:
   host_surface: desktop_app
   container_surface: cli_or_app_server
-  command: codex exec --skip-git-repo-check --ephemeral --sandbox workspace-write --ask-for-approval never -
+  command: codex exec --skip-git-repo-check --ephemeral --sandbox workspace-write -
   app_server_command: codex app-server
   turn_timeout_ms: 3600000
   read_timeout_ms: 5000

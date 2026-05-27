@@ -196,6 +196,7 @@ def check_workflow() -> None:
     assert data["codex"]["command"].startswith("codex exec")
     assert "--ephemeral" in data["codex"]["command"]
     assert "--skip-git-repo-check" in data["codex"]["command"]
+    assert "--ask-for-approval" not in data["codex"]["command"]
     assert data["codex"]["app_server_command"] == "codex app-server"
     assert data["memory"]["db_path"] == "/workspace/.memory/project-memory.sqlite3"
     assert data["quality_gates"]["skill"] == "superpowers-l4-quality-gates"

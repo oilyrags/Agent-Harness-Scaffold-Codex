@@ -217,7 +217,7 @@ def build_jira_active_issues_jql(project_key: str, active_states: list[str]) -> 
     escaped_project = project_key.strip().replace('"', '\\"')
     escaped_states = [state.replace('"', '\\"') for state in active_states]
     state_clause = ", ".join(f'"{state}"' for state in escaped_states)
-    return f'project = "{escaped_project}" AND status in ({state_clause}) ORDER BY updated DESC'
+    return f'project = "{escaped_project}" AND status in ({state_clause}) AND issuetype not in ("Epic") ORDER BY updated DESC'
 
 
 def extract_json_payload(text: str) -> Any:
